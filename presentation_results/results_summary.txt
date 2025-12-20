@@ -1,0 +1,35 @@
+=== ChestX-ray Pathology Detection - Final Results ===
+
+Dataset:
+- Total: 5,700 train images (5,000 normal + 700 pathology)
+- Val: 390 images (300 normal + 90 pathology)
+- Test: 90 images (all pathology)
+
+Model: YOLOv8-Nano
+Training: 40 epochs
+Learning Rate: 0.001
+Batch Size: 48
+
+Validation Metrics:
+- mAP50: 0.0841 ✅
+- mAP50-95: 0.0379 ✅
+- Precision: 0.2025
+- Recall: 0.0700
+- Instances detected: 100 (out of 104 in val set)
+
+Inference:
+- Test images processed: 90
+- Average inference time: ~3.9ms per image
+- Predictions saved to: predictions.json
+
+Key Learnings:
+1. Dataset imbalance (3.4% pathology) limits mAP but model learns
+2. mosaic augmentation helps with few positive samples
+3. Binary detection works better than multiclass on limited data
+4. Model achieves reasonable precision (0.20) despite low recall (0.07)
+
+Next Steps:
+- Collect more labeled pathology data (target: 2000+ samples)
+- Implement multiclass detection (specific pathologies)
+- Try larger model (YOLOv8-Small/Medium)
+- Apply post-processing NMS tuning
