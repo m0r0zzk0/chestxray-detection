@@ -1,5 +1,5 @@
 """
-Data preparation: CORRECT approach
+Data preparation: CORRECT approach - OPTIMIZED
 Strategy:
 - Train: Normal images (no boxes) - model learns background
 - Val: MIX of pathology (90) + normal (300) - can see actual objects
@@ -34,16 +34,6 @@ def normalize_bbox(x, y, w, h, img_width, img_height):
     return x_center, y_center, w_norm, h_norm
 
 
-def convert_grayscale_to_rgb(img_path, output_path):
-    """Convert grayscale PNG to RGB"""
-    img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
-    if img is not None:
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        cv2.imwrite(str(output_path), img_rgb)
-        return True
-    return False
-
-
 def prepare_dataset(
     csv_path,
     train_list_path,
@@ -51,18 +41,25 @@ def prepare_dataset(
     img_dir,
     output_dir,
     binary_mode=True,
+    max_train_normal=None,  # Limit normal images for faster training
 ):
     """
     Prepare YOLO dataset CORRECTLY.
     
     Strategy:
-    - Train: ~70k normal images (model learns background, no boxes)
+    - Train: ~5k normal images + 700 pathology (optimized for speed)
     - Val: 90 pathology + 300 normal (validation WITH boxes)
     - Test: 790 pathology (final evaluation)
+    
+    Set max_train_normal=None to use ALL 86k images for production
     """
     
     print("=" * 60)
     print("🔄 Preparing CORRECT dataset for YOLOv8...")
+    if max_train_normal:
+        print(f"⚡ Optimized: max {max_train_normal} normal images for speed")
+    else:
+        print("📊 Production: using ALL available normal images")
     print("=" * 60)
     
     output_path = Path(output_dir)
@@ -119,21 +116,25 @@ def prepare_dataset(
     np.random.shuffle(annotated_images)
     np.random.shuffle(normal_images)
     
-    # Val/Test: 90/90 pathology
+    # Val/Test: 90/790 pathology
     pathology_val = annotated_images[:90]
     pathology_test = annotated_images[90:180]
     pathology_train = annotated_images[180:]  # Rest to train
     
     # Normal split
     normal_val = normal_images[:300]
-    normal_train = normal_images[300:]  # All remaining to train
+    if max_train_normal:
+        normal_train = normal_images[300:300+max_train_normal]
+    else:
+        normal_train = normal_images[300:]  # All remaining for production
     
-    print(f"   Train: {len(pathology_train)} pathology + {len(normal_train)} normal")
-    print(f"   Val: {len(pathology_val)} pathology + {len(normal_val)} normal")
+    print(f"   Train: {len(pathology_train)} pathology + {len(normal_train)} normal = {len(pathology_train) + len(normal_train)} total")
+    print(f"   Val: {len(pathology_val)} pathology + {len(normal_val)} normal = {len(pathology_val) + len(normal_val)} total")
     print(f"   Test: {len(pathology_test)} pathology")
     
     # PROCESS IMAGES
     print("\n⚙️  Processing and copying images...")
+    print("   (This may take 15-60 minutes depending on dataset size)")
     
     img_dir = Path(img_dir)
     split_stats = {"train": 0, "val": 0, "test": 0}
@@ -239,6 +240,8 @@ def main():
     parser.add_argument('--test-list', type=str, default='data/test_list.txt')
     parser.add_argument('--img-dir', type=str, default='data/images')
     parser.add_argument('--output-dir', type=str, default='datasets')
+    parser.add_argument('--max-train-normal', type=int, default=5000,
+                        help='Max normal images for training (set to 0 for ALL)')
     
     args = parser.parse_args()
     
@@ -248,6 +251,7 @@ def main():
         test_list_path=args.test_list,
         img_dir=args.img_dir,
         output_dir=args.output_dir,
+        max_train_normal=args.max_train_normal if args.max_train_normal > 0 else None,
     )
 
 

@@ -69,7 +69,7 @@ def train_yolov8(
     data_yaml: str,
     model_name: str = "yolov8n",
     epochs: int = 100,
-    batch_size: int = 32,
+    batch_size: int = 48,
     img_size: int = 640,
     lr: float = 0.001,
     device: str = "0",
@@ -134,7 +134,7 @@ def train_yolov8(
         'amp': True,  # Automatic Mixed Precision
         'mosaic': 1.0,  # Data augmentation
         'augment': True,
-        'cache': True,
+        'cache': False,
         'workers': 8,
         'seed': 42,
         'deterministic': True,
