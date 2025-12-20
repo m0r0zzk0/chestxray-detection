@@ -138,6 +138,8 @@ def train_yolov8(
         'workers': 8,
         'seed': 42,
         'deterministic': True,
+        'copy_paste' : 0.0,
+        'hyp' : 'data/hyps/hyp.finetune.yaml'
     }
     
     logger.info("\n⚙️  Training Configuration:")
