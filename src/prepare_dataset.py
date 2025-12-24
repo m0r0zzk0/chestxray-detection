@@ -44,7 +44,7 @@ def prepare_dataset(
     max_train_normal=None,  # Limit normal images for faster training
 ):
     """
-    Prepare YOLO dataset CORRECTLY.
+    Prepare YOLO dataset.
     
     Strategy:
     - Train: ~5k normal images + 700 pathology (optimized for speed)
@@ -53,14 +53,9 @@ def prepare_dataset(
     
     Set max_train_normal=None to use ALL 86k images for production
     """
+
+    print(" Preparing CORRECT dataset for YOLOv8...")
     
-    print("=" * 60)
-    print("🔄 Preparing CORRECT dataset for YOLOv8...")
-    if max_train_normal:
-        print(f"⚡ Optimized: max {max_train_normal} normal images for speed")
-    else:
-        print("📊 Production: using ALL available normal images")
-    print("=" * 60)
     
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True)
@@ -69,11 +64,11 @@ def prepare_dataset(
         (output_path / "images" / split).mkdir(parents=True, exist_ok=True)
         (output_path / "labels" / split).mkdir(parents=True, exist_ok=True)
     
-    print("\n📖 Loading data...")
+    # Loading data
     
     df = pd.read_csv(csv_path)
     annotated_images = list(df['Image Index'].unique())
-    print(f"   Annotated images (CSV): {len(annotated_images)}")
+    print(f"  Annotated images (CSV): {len(annotated_images)}")
     
     with open(train_list_path, 'r') as f:
         train_val_images = set(line.strip() for line in f if line.strip())
@@ -86,16 +81,16 @@ def prepare_dataset(
     if binary_mode:
         class_names = ["pathology"]
         class_map = {label: 0 for label in df['Finding Label'].unique()}
-        print(f"\n📌 Binary mode: pathology class")
+        print(f"\n Binary mode: pathology class")
     else:
         class_names = sorted(df['Finding Label'].unique().tolist())
         class_map = {label: idx for idx, label in enumerate(class_names)}
-        print(f"📌 Multiclass mode: {len(class_names)} classes")
+        print(f" Multiclass mode: {len(class_names)} classes")
     
     print(f"   Classes: {class_names}")
     
     # GROUP ANNOTATIONS
-    print("\n🗂️  Grouping annotations by image...")
+    print("\n  Grouping annotations by image")
     annotations = defaultdict(list)
     
     for idx, row in df.iterrows():
@@ -112,7 +107,7 @@ def prepare_dataset(
         })
     
     # SPLIT STRATEGY
-    print("\n📊 Splitting data...")
+    print("\n Splitting data...")
     np.random.shuffle(annotated_images)
     np.random.shuffle(normal_images)
     
@@ -126,15 +121,14 @@ def prepare_dataset(
     if max_train_normal:
         normal_train = normal_images[300:300+max_train_normal]
     else:
-        normal_train = normal_images[300:]  # All remaining for production
+        normal_train = normal_images[300:] 
     
     print(f"   Train: {len(pathology_train)} pathology + {len(normal_train)} normal = {len(pathology_train) + len(normal_train)} total")
     print(f"   Val: {len(pathology_val)} pathology + {len(normal_val)} normal = {len(pathology_val) + len(normal_val)} total")
     print(f"   Test: {len(pathology_test)} pathology")
     
     # PROCESS IMAGES
-    print("\n⚙️  Processing and copying images...")
-    print("   (This may take 15-60 minutes depending on dataset size)")
+    print("\n  Processing and copying images")
     
     img_dir = Path(img_dir)
     split_stats = {"train": 0, "val": 0, "test": 0}
@@ -200,10 +194,10 @@ def prepare_dataset(
     print(f"Total: {sum(split_stats.values())}")
     
     if missing:
-        print(f"\n⚠️  Missing images: {len(missing)}")
+        print(f"\n  Missing images: {len(missing)}")
     
     # VERIFY
-    print("\n✔️  Verifying dataset structure...")
+    print("\n  Verifying dataset structure")
     for split in ["train", "val", "test"]:
         imgs = list((output_path / "images" / split).glob("*.png"))
         lbls = list((output_path / "labels" / split).glob("*.txt"))
@@ -211,7 +205,7 @@ def prepare_dataset(
         print(f"   {split.upper()}: {len(imgs)} images, {len(lbls)} labels ({non_empty} with boxes)")
     
     # CREATE DATA.YAML
-    print("\n📝 Creating data.yaml...")
+    print("\n Creating data.yaml...")
     
     data_yaml = {
         'path': str(output_path.absolute()),
@@ -229,7 +223,7 @@ def prepare_dataset(
     print(f"   Saved to: {yaml_path}")
     
     print("\n" + "=" * 60)
-    print("✅ CORRECT dataset preparation complete!")
+    print("dataset preparation complete!")
     print("=" * 60)
 
 

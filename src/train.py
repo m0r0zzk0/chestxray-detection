@@ -1,38 +1,19 @@
 """
-YOLOv8 Training Script - Production Ready
-Features:
-- Mixed precision training (AMP)
-- Learning rate scheduling (cosine annealing)
-- Early stopping
-- Model checkpointing (best + last)
-- Metrics logging (CSV + JSON)
-- Experiment tracking
-- Inference on test set
+YOLOv8 Training Script - Simple Edition
+
+Run: python src/train.py
+(all parameters by default, ready to run)
 """
 
-import os
 import json
-import argparse
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Tuple
-
 import torch
-import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
-import numpy as np
-from tqdm import tqdm
-import yaml
-
 from ultralytics import YOLO
-from ultralytics.utils.metrics import box_iou
 
-# ============================================================
-# SETUP LOGGING
-# ============================================================
 
-def setup_logging(log_dir: str) -> logging.Logger:
+def setup_logging(log_dir: str):
     """Setup logging to file and console"""
     log_dir = Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -49,9 +30,7 @@ def setup_logging(log_dir: str) -> logging.Logger:
     ch.setLevel(logging.INFO)
     
     # Formatter
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
     
@@ -61,173 +40,145 @@ def setup_logging(log_dir: str) -> logging.Logger:
     return logger
 
 
-# ============================================================
-# TRAINING
-# ============================================================
-
-def train_yolov8(
-    data_yaml: str,
-    model_name: str = "yolov8n",
-    epochs: int = 100,
-    batch_size: int = 48,
-    img_size: int = 640,
-    lr: float = 0.001,
-    device: str = "0",
-    output_dir: str = "results",
-    patience: int = 20,
-    project_name: str = "chestxray-detection",
-):
-    """
-    Train YOLOv8 model
+def train():
+    """Main training function"""
     
-    Args:
-        data_yaml: Path to data.yaml
-        model_name: YOLOv8 model size (nano/small/medium/large/xlarge)
-        epochs: Number of training epochs
-        batch_size: Batch size
-        img_size: Input image size
-        lr: Learning rate
-        device: GPU device id (e.g., "0" for cuda:0, "0,1" for multi-gpu)
-        output_dir: Output directory for results
-        patience: Early stopping patience
-        project_name: Project name for organizing results
-    """
+    # ============================================================
+    # PARAMETERS (CHANGE HERE IF NEEDED)
+    # ============================================================
     
-    # Setup
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    data_yaml = "datasets/data.yaml"
+    model_size = "n"  # n, s, m, l, x
+    epochs = 40
+    batch_size = 48
+    img_size = 640
+    learning_rate = 0.001
+    device = "0"  # GPU id
+    output_dir = "results"
+    patience = 10  # Early stopping
     
-    logger = setup_logging(output_dir)
+    # ============================================================
+    # INITIALIZATION
+    # ============================================================
+    
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    logger = setup_logging(output_dir_path)
     
     logger.info("=" * 60)
-    logger.info("🚀 Starting YOLOv8 Training")
+    logger.info("Starting YOLOv8 Training")
     logger.info("=" * 60)
     
-    # Device setup
-    device = f"cuda:{device}" if torch.cuda.is_available() else "cpu"
-    logger.info(f"Device: {device}")
+    # Check GPU
+    device_str = f"cuda:{device}" if torch.cuda.is_available() else "cpu"
+    logger.info(f"Device: {device_str}")
     logger.info(f"GPU Available: {torch.cuda.is_available()}")
+    
     if torch.cuda.is_available():
         logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f}GB")
     
-    # Load model
-    logger.info(f"\n📦 Loading model: yolov8{model_name}")
-    model = YOLO(f"yolov8{model_name}.pt")
+    # ============================================================
+    # MODEL LOADING
+    # ============================================================
     
-    # Training config
+    logger.info(f"\nLoading model: yolov8{model_size}")
+    model = YOLO(f"yolov8{model_size}.pt")
+    
+    # ============================================================
+    # TRAINING CONFIGURATION
+    # ============================================================
+    
+    # Remove 'hyp' - not supported in new ultralytics versions
     train_config = {
         'data': data_yaml,
         'epochs': epochs,
         'imgsz': img_size,
         'batch': batch_size,
-        'lr0': lr,
+        'lr0': learning_rate,
         'device': device,
         'patience': patience,
         'save': True,
-        'project': str(output_dir / project_name),
-        'name': f"{model_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        'project': str(output_dir_path / "detect"),
+        'name': f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         'exist_ok': False,
         'verbose': True,
-        'plots': True,  # Save training plots
-        'conf': 0.25,
-        'iou': 0.45,
+        'plots': True,
         'amp': True,  # Automatic Mixed Precision
-        'mosaic': 1.0,  # Data augmentation
+        'mosaic': 1.0,  # Augmentation
         'augment': True,
-        'cache': False,
+        'cache': False,  # No cache
         'workers': 8,
         'seed': 42,
         'deterministic': True,
-        'copy_paste' : 0.0,
-        'hyp' : 'data/hyps/hyp.finetune.yaml'
+        'copy_paste': 0.0,
     }
     
-    logger.info("\n⚙️  Training Configuration:")
+    logger.info("\nTraining Configuration:")
     for key, value in train_config.items():
         logger.info(f"   {key}: {value}")
     
     # Save config
-    config_path = output_dir / "train_config.json"
+    config_path = output_dir_path / "train_config.json"
     with open(config_path, 'w') as f:
         json.dump(train_config, f, indent=2, default=str)
-    logger.info(f"\n   Config saved to: {config_path}")
+    logger.info(f"\nConfig saved: {config_path}")
     
-    # Train
+    # ============================================================
+    # TRAINING
+    # ============================================================
+    
     logger.info("\n" + "=" * 60)
-    logger.info("🔥 Starting training...")
+    logger.info("Starting training...")
     logger.info("=" * 60)
     
     try:
         results = model.train(**train_config)
         
         logger.info("\n" + "=" * 60)
-        logger.info("✅ Training complete!")
+        logger.info("Training complete!")
         logger.info("=" * 60)
         
         # Copy best model
         best_model_src = Path(results.save_dir) / "weights" / "best.pt"
-        best_model_dst = output_dir / "best_model.pt"
+        best_model_dst = output_dir_path / "best_model.pt"
         
         if best_model_src.exists():
             import shutil
             shutil.copy2(best_model_src, best_model_dst)
-            logger.info(f"\n📊 Best model saved to: {best_model_dst}")
+            logger.info(f"\nBest model: {best_model_dst}")
         
-        # Log results
-        logger.info("\n📈 Training Results:")
-        logger.info(f"   Results directory: {results.save_dir}")
+        logger.info(f"Results directory: {results.save_dir}")
         
         return results, best_model_dst
         
     except Exception as e:
-        logger.error(f"\n❌ Training failed: {e}")
+        logger.error(f"\nTraining failed: {e}")
         raise
 
 
-# ============================================================
-# EVALUATION
-# ============================================================
-
-def evaluate_model(
-    model_path: str,
-    data_yaml: str,
-    device: str = "0",
-    conf_threshold: float = 0.25,
-    iou_threshold: float = 0.45,
-):
-    """
-    Evaluate model on validation set
+def evaluate(best_model_path: str):
+    """Evaluate model on validation set"""
     
-    Args:
-        model_path: Path to trained model
-        data_yaml: Path to data.yaml
-        device: GPU device
-        conf_threshold: Confidence threshold
-        iou_threshold: IoU threshold for NMS
-    """
+    output_dir_path = Path("results")
+    logger = setup_logging(output_dir_path)
     
-    logger = logging.getLogger(__name__)
     logger.info("\n" + "=" * 60)
-    logger.info("📊 Evaluating Model")
+    logger.info("Evaluating model")
     logger.info("=" * 60)
     
-    device = f"cuda:{device}" if torch.cuda.is_available() else "cpu"
+    device = "0" if torch.cuda.is_available() else "cpu"
     
-    # Load model
-    model = YOLO(model_path)
+    model = YOLO(str(best_model_path))
     
-    # Validate
     metrics = model.val(
-        data=data_yaml,
+        data="datasets/data.yaml",
         device=device,
-        conf=conf_threshold,
-        iou=iou_threshold,
         imgsz=640,
         batch=32,
         plots=True,
     )
     
-    logger.info("\n📈 Validation Metrics:")
+    logger.info("\nValidation Metrics:")
     logger.info(f"   mAP50: {metrics.box.map50:.4f}")
     logger.info(f"   mAP50-95: {metrics.box.map:.4f}")
     logger.info(f"   Precision: {metrics.box.mp:.4f}")
@@ -236,54 +187,34 @@ def evaluate_model(
     return metrics
 
 
-# ============================================================
-# INFERENCE
-# ============================================================
-
-def predict_on_test_set(
-    model_path: str,
-    test_images_dir: str,
-    output_dir: str = "results",
-    conf_threshold: float = 0.25,
-    device: str = "0",
-):
-    """
-    Run inference on test set
+def predict(model_path: str, test_dir: str = "datasets/images/test"):
+    """Run inference on test set"""
     
-    Args:
-        model_path: Path to trained model
-        test_images_dir: Directory with test images
-        output_dir: Output directory for predictions
-        conf_threshold: Confidence threshold
-        device: GPU device
-    """
+    output_dir_path = Path("results")
+    logger = setup_logging(output_dir_path)
     
-    logger = logging.getLogger(__name__)
     logger.info("\n" + "=" * 60)
-    logger.info("🎯 Running Inference on Test Set")
+    logger.info("Running inference on test set")
     logger.info("=" * 60)
     
-    device = f"cuda:{device}" if torch.cuda.is_available() else "cpu"
-    output_dir = Path(output_dir) / "predictions"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    device = "0" if torch.cuda.is_available() else "cpu"
+    predictions_dir = output_dir_path / "predictions"
+    predictions_dir.mkdir(parents=True, exist_ok=True)
     
-    # Load model
-    model = YOLO(model_path)
+    model = YOLO(str(model_path))
     
-    # Get test images
-    test_dir = Path(test_images_dir)
-    image_files = list(test_dir.glob("*.png")) + list(test_dir.glob("*.jpg"))
+    test_path = Path(test_dir)
+    image_files = sorted(test_path.glob("*.png")) + sorted(test_path.glob("*.jpg"))
     
     logger.info(f"   Found {len(image_files)} test images")
     
     # Run inference
     predictions = []
     
-    for img_path in tqdm(image_files, desc="Predicting"):
+    for img_path in image_files:
         results = model.predict(
             source=str(img_path),
             device=device,
-            conf=conf_threshold,
             imgsz=640,
             verbose=False,
         )
@@ -307,100 +238,26 @@ def predict_on_test_set(
             predictions.append(pred_data)
     
     # Save predictions
-    pred_path = output_dir / "predictions.json"
+    pred_path = predictions_dir / "predictions.json"
     with open(pred_path, 'w') as f:
         json.dump(predictions, f, indent=2)
     
-    logger.info(f"\n✅ Predictions saved to: {pred_path}")
+    logger.info(f"\nPredictions saved: {pred_path}")
     logger.info(f"   Total predictions: {len(predictions)}")
     
     return predictions
 
 
-# ============================================================
-# MAIN
-# ============================================================
-
-def main():
-    parser = argparse.ArgumentParser(description='Train YOLOv8 for ChestX-ray detection')
-    
-    # Data
-    parser.add_argument('--data-yaml', type=str, default='datasets/data.yaml',
-                        help='Path to data.yaml')
-    
-    # Model
-    parser.add_argument('--model', type=str, default='n',
-                        choices=['n', 's', 'm', 'l', 'x'],
-                        help='YOLOv8 model size')
-    
-    # Training
-    parser.add_argument('--epochs', type=int, default=100,
-                        help='Number of epochs')
-    parser.add_argument('--batch-size', type=int, default=32,
-                        help='Batch size')
-    parser.add_argument('--img-size', type=int, default=640,
-                        help='Input image size')
-    parser.add_argument('--lr', type=float, default=0.001,
-                        help='Learning rate')
-    parser.add_argument('--patience', type=int, default=20,
-                        help='Early stopping patience')
-    
-    # Device
-    parser.add_argument('--device', type=str, default='0',
-                        help='GPU device id (e.g., "0" or "0,1")')
-    
-    # Output
-    parser.add_argument('--output-dir', type=str, default='results',
-                        help='Output directory')
-    
-    # Inference
-    parser.add_argument('--predict', action='store_true',
-                        help='Run inference on test set after training')
-    parser.add_argument('--model-path', type=str, default=None,
-                        help='Path to trained model for inference only')
-    parser.add_argument('--test-dir', type=str, default='datasets/images/test',
-                        help='Path to test images directory')
-    
-    args = parser.parse_args()
-    
+if __name__ == "__main__":
     # Train
-    if args.model_path is None:
-        results, best_model = train_yolov8(
-            data_yaml=args.data_yaml,
-            model_name=args.model,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            img_size=args.img_size,
-            lr=args.lr,
-            device=args.device,
-            output_dir=args.output_dir,
-            patience=args.patience,
-        )
-        best_model = str(best_model)
-    else:
-        best_model = args.model_path
+    results, best_model = train()
     
     # Evaluate
-    logger = setup_logging(args.output_dir)
-    metrics = evaluate_model(
-        model_path=best_model,
-        data_yaml=args.data_yaml,
-        device=args.device,
-    )
+    metrics = evaluate(best_model)
     
     # Predict
-    if args.predict or args.model_path is not None:
-        predictions = predict_on_test_set(
-            model_path=best_model,
-            test_images_dir=args.test_dir,
-            output_dir=args.output_dir,
-            device=args.device,
-        )
+    predictions = predict(best_model)
     
-    logger.info("\n" + "=" * 60)
-    logger.info("🎉 All done!")
-    logger.info("=" * 60)
-
-
-if __name__ == '__main__':
-    main()
+    print("\n" + "=" * 60)
+    print("Done!")
+    print("=" * 60)

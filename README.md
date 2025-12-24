@@ -166,6 +166,7 @@ GPU Memory (RTX 3060, 12GB):
 ## 📈 Expected Training Progress
 
 ### Epoch 1-5: Initialization
+
 ```
 Instances: 0-5        (model learning to detect)
 box_loss: 2.0-3.0     (localization loss)
@@ -174,6 +175,7 @@ Metrics: 0            (predictions too weak)
 ```
 
 ### Epoch 10-20: Learning Accelerates
+
 ```
 Instances: 20-40      (stable detection)
 box_loss: 1.5-2.0     (steady improvement)
@@ -182,6 +184,7 @@ Metrics: 0.01-0.05    (first predictions)
 ```
 
 ### Epoch 25-40: Refinement
+
 ```
 Instances: 20-30      (stable)
 box_loss: 1.5-2.0     (minimal change)
@@ -196,6 +199,7 @@ Metrics: 0.05-0.15    (measurable gains)
 ### Baseline Metrics (40 epochs, batch=48)
 
 Expected performance for **binary pathology detection**:
+
 - **mAP50**: 0.08-0.15 (reasonable for 700 annotated samples)
 - **mAP50-95**: 0.03-0.08 (stricter metric)
 - **Precision**: 0.15-0.25
@@ -215,6 +219,7 @@ Expected performance for **binary pathology detection**:
 ## 🔧 Troubleshooting
 
 ### ❌ "Instances: 0" throughout training
+
 ```bash
 # Check label files
 (ls datasets/labels/train/*.txt | Where-Object {(Get-Item $_).Length -gt 0}).Count
@@ -222,18 +227,21 @@ Expected performance for **binary pathology detection**:
 ```
 
 ### ❌ "CUDA out of memory" at epoch 31
+
 ```bash
 # Albumentations kicks in, reduce batch
 python src/train.py --batch-size 32 ...
 ```
 
 ### ❌ "No such file: datasets/data.yaml"
+
 ```bash
 # Run data prep first
 python src/data_prep_correct_optimized.py --max-train-normal 0
 ```
 
 ### ❌ Validation metrics = 0 at epoch 40
+
 ```bash
 # Verify val set has pathology boxes
 # Should have 90 non-empty .txt files in datasets/labels/val/
@@ -244,6 +252,7 @@ python src/data_prep_correct_optimized.py --max-train-normal 0
 ## 📚 File Descriptions
 
 ### `data_prep_correct_optimized.py`
+
 - Loads CSV annotations + image lists
 - Converts pixel coords to YOLO normalized format
 - Splits data with custom strategy (train/val/test)
@@ -251,6 +260,7 @@ python src/data_prep_correct_optimized.py --max-train-normal 0
 - Saves YOLO-format labels + data.yaml
 
 **Usage:**
+
 ```bash
 python src/data_prep_correct_optimized.py \
     --csv-path data/annotations.csv \
@@ -261,6 +271,7 @@ python src/data_prep_correct_optimized.py \
 ```
 
 ### `train.py`
+
 - YOLOv8 training loop with proper config
 - Logging + early stopping
 - Model checkpointing (best + last)
@@ -268,6 +279,7 @@ python src/data_prep_correct_optimized.py \
 - Optional inference after training
 
 **Usage:**
+
 ```bash
 python src/train.py \
     --data-yaml datasets/data.yaml \
@@ -278,12 +290,14 @@ python src/train.py \
 ```
 
 ### `evaluate.py`
+
 - Compute mAP, precision, recall
 - Per-class metrics
 - Confusion matrix
 - Export results to CSV
 
 ### `predict.py`
+
 - Inference on image folder
 - Visualization with bboxes
 - Confidence filtering
@@ -310,15 +324,18 @@ Recommendations:
 ## 🎯 Performance Notes
 
 ### Training Time
+
 - **5k normal images**: ~1 hour × 40 epochs = 40 hours
 - **86k normal images**: ~3 hours × 40 epochs = 120 hours
 - Per epoch: 8-12 minutes (varies with cache, augmentations)
 
 ### Inference Speed
+
 - **Latency**: 1.6 ms per image (RTX 3060)
 - **Throughput**: ~625 images/second
 
 ### Reproducibility
+
 - Seed: 42 (deterministic training)
 - Fixed augmentations
 - Saved config → full reproducibility
@@ -328,6 +345,7 @@ Recommendations:
 ## 📖 Additional Resources
 
 For detailed information, see **DOCUMENTATION.md**:
+
 - ✅ Complete data split strategy explanation
 - ✅ Training dynamics & red flags
 - ✅ Metric explanations
@@ -339,18 +357,21 @@ For detailed information, see **DOCUMENTATION.md**:
 ## 🚀 Next Steps
 
 ### Immediate (Testing)
+
 1. Run full data prep: `python src/data_prep_correct_optimized.py --max-train-normal 0`
 2. Train model: 40 epochs on full dataset
 3. Evaluate metrics on test set
 4. Run predictions
 
 ### Short-term (Enhancement)
+
 1. **Multiclass Detection**: Implement specific pathology classes
 2. **Model Scaling**: Try YOLOv8-Small for improved accuracy
 3. **Confidence Tuning**: Optimize threshold for production
 4. **Post-processing**: Advanced NMS strategies
 
 ### Long-term (Deployment)
+
 1. **ONNX Export**: Model inference optimization
 2. **API Service**: REST endpoint for predictions
 3. **Clinical Validation**: External dataset testing
@@ -364,27 +385,6 @@ For detailed information, see **DOCUMENTATION.md**:
 - [YOLO Format](https://roboflow.com/formats/yolo-darknet-txt)
 - [Object Detection Metrics](https://github.com/rafaelpadilla/Object-Detection-Metrics)
 - [ChexPert Dataset](https://stanfordmlgroup.github.io/competitions/chexpert/)
-
----
-
-## 📄 License
-
-MIT
-
----
-
-## ✅ Checklist for Presentation
-
-- [x] Data pipeline working (86k+ images prepared)
-- [x] Training pipeline validated (metrics computing)
-- [x] Baseline model trained (40 epochs complete)
-- [x] Comprehensive documentation
-- [x] Troubleshooting guide
-- [x] .gitignore for large files
-- [ ] Final test set evaluation
-- [ ] Production deployment (optional)
-
-**Status**: Ready for Monday presentation ✅
 
 ---
 
